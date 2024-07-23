@@ -5,25 +5,26 @@ from scipy.constants import G, k, elementary_charge
 import pygame
 
 # Constants
-NUM_PARTICLES = 85000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+NUM_PARTICLES = 100
 TIME_STEP = 0.01
-INPUT_NODES = 3
-HIDDEN_NODES = 10
+INPUT_NODES = 6  # Increased input nodes for more complex behaviors
+HIDDEN_NODES = 20  # Increased hidden nodes for more complex behaviors
 OUTPUT_NODES = 3
 SCREEN_SIZE = 800
 PARTICLE_RADIUS = 2
 NUM_ITERATIONS = 1000
+BOUNDARY = 10.0  # Boundary for the simulation space
 
 # Particle class
 class Particle:
     def __init__(self):
-        self.position = np.random.uniform(-5.0, 5.0, 3)
+        self.position = np.random.uniform(-BOUNDARY, BOUNDARY, 3)
         self.momentum = np.random.uniform(-1.0, 1.0, 3)
         self.wavefunction = 1.0 + 0.0j
         self.nn = NeuralNetwork()
 
     def update(self):
-        inputs = self.position
+        inputs = np.concatenate((self.position, self.momentum))
         self.nn.forward_pass(inputs)
         self.momentum += self.nn.output_layer * TIME_STEP
 
@@ -52,6 +53,16 @@ class Environment:
         particle.wavefunction *= cmath.exp(-1j * (potential + 0.5 * particle.momentum[0] ** 2) * TIME_STEP)
         particle.position += particle.momentum * TIME_STEP
         particle.momentum -= particle.position * TIME_STEP
+        self.handle_boundaries(particle)
+
+    def handle_boundaries(self, particle):
+        for i in range(3):
+            if particle.position[i] > BOUNDARY:
+                particle.position[i] = BOUNDARY
+                particle.momentum[i] *= -1
+            elif particle.position[i] < -BOUNDARY:
+                particle.position[i] = -BOUNDARY
+                particle.momentum[i] *= -1
 
     def evolve_system(self):
         for particle in self.particles:
@@ -77,6 +88,15 @@ class Environment:
                         force = (elementary_charge ** 2) / (4 * np.pi * distance ** 2)
                         p1.momentum += force * dx / distance * TIME_STEP
 
+    def simulate_collisions(self):
+        for i, p1 in enumerate(self.particles):
+            for j, p2 in enumerate(self.particles):
+                if i != j:
+                    dx = p2.position - p1.position
+                    distance = np.linalg.norm(dx)
+                    if distance < 2 * PARTICLE_RADIUS:
+                        p1.momentum, p2.momentum = p2.momentum, p1.momentum
+
     def simulate_thermodynamics(self):
         total_energy = sum(0.5 * np.linalg.norm(p.momentum) ** 2 for p in self.particles)
         temperature = total_energy / (len(self.particles) * k)
@@ -98,7 +118,7 @@ class Environment:
         for p in self.particles:
             if abs(p.wavefunction) > 1.0:
                 p.wavefunction = 1.0 + 0.0j
-                p.position = np.clip(p.position, -10.0, 10.0)
+                p.position = np.clip(p.position, -BOUNDARY, BOUNDARY)
                 p.momentum = np.clip(p.momentum, -1.0, 1.0)
 
 def simulate_consciousness_with_nn(particles):
@@ -110,6 +130,7 @@ def run_simulation(particles):
     env = Environment(particles)
     env.simulate_gravity()
     env.simulate_electromagnetic_forces()
+    env.simulate_collisions()
     env.evolve_system()
     env.simulate_entanglement()
     env.advanced_error_correction()
@@ -136,8 +157,8 @@ def main():
 
         # Draw particles
         for particle in particles:
-            x = int((particle.position[0] + 5) / 10 * SCREEN_SIZE)
-            y = int((particle.position[1] + 5) / 10 * SCREEN_SIZE)
+            x = int((particle.position[0] + BOUNDARY) / (2 * BOUNDARY) * SCREEN_SIZE)
+            y = int((particle.position[1] + BOUNDARY) / (2 * BOUNDARY) * SCREEN_SIZE)
             pygame.draw.circle(screen, (255, 255, 255), (x, y), PARTICLE_RADIUS)
 
         # Update display
