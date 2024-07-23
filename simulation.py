@@ -22,11 +22,21 @@ class Particle:
         self.momentum = np.random.uniform(-1.0, 1.0, 3)
         self.wavefunction = 1.0 + 0.0j
         self.nn = NeuralNetwork()
+        self.goal = np.random.choice(['seek', 'avoid'])
+        self.target = np.random.randint(0, NUM_PARTICLES)
 
-    def update(self):
-        inputs = np.concatenate((self.position, self.momentum))
+    def update(self, particles):
+        target_particle = particles[self.target]
+        inputs = np.concatenate((self.position, target_particle.position))
         self.nn.forward_pass(inputs)
-        self.momentum += self.nn.output_layer * TIME_STEP
+        behavior = self.nn.output_layer
+
+        if self.goal == 'seek':
+            self.momentum += behavior * (target_particle.position - self.position) * TIME_STEP
+        elif self.goal == 'avoid':
+            self.momentum -= behavior * (target_particle.position - self.position) * TIME_STEP
+
+        self.momentum = np.clip(self.momentum, -1.0, 1.0)
 
 # NeuralNetwork class
 class NeuralNetwork:
@@ -42,6 +52,10 @@ class NeuralNetwork:
     def forward_pass(self, inputs):
         self.hidden_layer = self.sigmoid(np.dot(inputs, self.weights_input_hidden))
         self.output_layer = self.sigmoid(np.dot(self.hidden_layer, self.weights_hidden_output))
+
+    def update_weights(self, learning_rate, error):
+        self.weights_hidden_output += learning_rate * np.outer(self.hidden_layer, error)
+        self.weights_input_hidden += learning_rate * np.outer(inputs, np.dot(error, self.weights_hidden_output.T))
 
 # Environment class for handling different interactions
 class Environment:
@@ -123,7 +137,7 @@ class Environment:
 
 def simulate_consciousness_with_nn(particles):
     for i, particle in enumerate(particles):
-        particle.update()
+        particle.update(particles)
         print(f"Consciousness Output for Particle {i}: ({particle.nn.output_layer[0]:.6f}, {particle.nn.output_layer[1]:.6f}, {particle.nn.output_layer[2]:.6f})")
 
 def run_simulation(particles):
