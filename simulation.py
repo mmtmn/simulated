@@ -14,6 +14,8 @@ SCREEN_SIZE = 800
 PARTICLE_RADIUS = 2
 NUM_ITERATIONS = 1000
 BOUNDARY = 10.0  # Boundary for the simulation space
+LEARNING_RATE = 0.01
+REWARD_DISTANCE = 1.0  # Distance within which a particle is considered to have achieved its goal
 
 # Particle class
 class Particle:
@@ -24,6 +26,7 @@ class Particle:
         self.nn = NeuralNetwork()
         self.goal = np.random.choice(['seek', 'avoid'])
         self.target = np.random.randint(0, NUM_PARTICLES)
+        self.reward = 0
 
     def update(self, particles):
         target_particle = particles[self.target]
@@ -37,6 +40,17 @@ class Particle:
             self.momentum -= behavior * (target_particle.position - self.position) * TIME_STEP
 
         self.momentum = np.clip(self.momentum, -1.0, 1.0)
+        self.update_reward(target_particle)
+        self.nn.update_weights(LEARNING_RATE, self.reward)
+
+    def update_reward(self, target_particle):
+        distance = np.linalg.norm(self.position - target_particle.position)
+        if self.goal == 'seek' and distance < REWARD_DISTANCE:
+            self.reward = 1
+        elif self.goal == 'avoid' and distance > REWARD_DISTANCE:
+            self.reward = 1
+        else:
+            self.reward = -1
 
 # NeuralNetwork class
 class NeuralNetwork:
@@ -53,9 +67,10 @@ class NeuralNetwork:
         self.hidden_layer = self.sigmoid(np.dot(inputs, self.weights_input_hidden))
         self.output_layer = self.sigmoid(np.dot(self.hidden_layer, self.weights_hidden_output))
 
-    def update_weights(self, learning_rate, error):
+    def update_weights(self, learning_rate, reward):
+        error = reward - self.output_layer
         self.weights_hidden_output += learning_rate * np.outer(self.hidden_layer, error)
-        self.weights_input_hidden += learning_rate * np.outer(inputs, np.dot(error, self.weights_hidden_output.T))
+        self.weights_input_hidden += learning_rate * np.outer(self.hidden_layer, np.dot(error, self.weights_hidden_output.T))
 
 # Environment class for handling different interactions
 class Environment:
@@ -173,7 +188,8 @@ def main():
         for particle in particles:
             x = int((particle.position[0] + BOUNDARY) / (2 * BOUNDARY) * SCREEN_SIZE)
             y = int((particle.position[1] + BOUNDARY) / (2 * BOUNDARY) * SCREEN_SIZE)
-            pygame.draw.circle(screen, (255, 255, 255), (x, y), PARTICLE_RADIUS)
+            color = (0, 255, 0) if particle.goal == 'seek' else (255, 0, 0)
+            pygame.draw.circle(screen, color, (x, y), PARTICLE_RADIUS)
 
         # Update display
         pygame.display.flip()
