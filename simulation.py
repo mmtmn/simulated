@@ -16,6 +16,7 @@ NUM_ITERATIONS = 1000
 BOUNDARY = 10.0  # Boundary for the simulation space
 LEARNING_RATE = 0.01
 REWARD_DISTANCE = 1.0  # Distance within which a particle is considered to have achieved its goal
+MUTATION_RATE = 0.01  # Mutation rate for genetic algorithm
 
 # Particle class
 class Particle:
@@ -52,6 +53,9 @@ class Particle:
         else:
             self.reward = -1
 
+    def mutate(self):
+        self.nn.mutate(MUTATION_RATE)
+
 # NeuralNetwork class
 class NeuralNetwork:
     def __init__(self):
@@ -71,6 +75,12 @@ class NeuralNetwork:
         error = reward - self.output_layer
         self.weights_hidden_output += learning_rate * np.outer(self.hidden_layer, error)
         self.weights_input_hidden += learning_rate * np.outer(self.hidden_layer, np.dot(error, self.weights_hidden_output.T))
+
+    def mutate(self, mutation_rate):
+        mutation_mask_input_hidden = np.random.rand(*self.weights_input_hidden.shape) < mutation_rate
+        mutation_mask_hidden_output = np.random.rand(*self.weights_hidden_output.shape) < mutation_rate
+        self.weights_input_hidden += mutation_mask_input_hidden * np.random.uniform(-0.1, 0.1, self.weights_input_hidden.shape)
+        self.weights_hidden_output += mutation_mask_hidden_output * np.random.uniform(-0.1, 0.1, self.weights_hidden_output.shape)
 
 # Environment class for handling different interactions
 class Environment:
